@@ -13,35 +13,32 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import json
 
-# Convert st.secrets sections safely to normal dicts
-credentials = json.loads(st.secrets['credentials'].to_json())
-cookie = json.loads(st.secrets['cookie'].to_json())
+# Safely convert secrets subsections into normal dicts
+credentials = json.loads(json.dumps(dict(st.secrets["credentials"])))
+cookie = json.loads(json.dumps(dict(st.secrets["cookie"])))
 
 authenticator = stauth.Authenticate(
     credentials,
-    cookie['name'],
-    cookie['key'],
-    cookie['expiry_days']
+    cookie["name"],
+    cookie["key"],
+    cookie["expiry_days"]
 )
 
 # Login widget
 authenticator.login()
 
 # Check authentication status
-if st.session_state["authentication_status"]:
-    authenticator.logout(location='sidebar')
+if st.session_state.get("authentication_status"):
+    authenticator.logout(location="sidebar")
     st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
-    
-    # Your dashboard code here
 
-elif st.session_state["authentication_status"] is False:
-    st.error('❌ Username/password is incorrect')
+elif st.session_state.get("authentication_status") is False:
+    st.error("❌ Username/password is incorrect")
     st.stop()
 
-elif st.session_state["authentication_status"] is None:
-    st.warning('⚠️ Please enter your username and password')
+else:
+    st.warning("⚠️ Please enter your username and password")
     st.stop()
-
 
 
 # Database setup
@@ -687,6 +684,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
