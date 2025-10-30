@@ -47,6 +47,18 @@ authenticator.logout(location="sidebar")
 st.sidebar.markdown(f"👋 Logged in as: **{st.session_state['name']}**")
 
 
+# ==================== HELPER: TYPE CONVERSION ====================
+
+def convert_numpy_types(value):
+    """Convert numpy types to Python native types for psycopg2"""
+    if isinstance(value, np.integer):
+        return int(value)
+    elif isinstance(value, np.floating):
+        return float(value)
+    elif isinstance(value, np.ndarray):
+        return value.tolist()
+    return value
+
 # ==================== DATABASE FUNCTIONS ====================
 
 @st.cache_resource
@@ -84,6 +96,8 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     try:
         c = get_cursor()
         if params:
+            # Convert numpy types in params
+            params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
@@ -105,6 +119,8 @@ def execute_update(query, params=None):
     try:
         c = get_cursor()
         if params:
+            # Convert numpy types in params
+            params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
@@ -121,13 +137,15 @@ def execute_insert_with_return(query, params=None):
     try:
         c = get_cursor()
         if params:
+            # Convert numpy types in params
+            params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
         result = c.fetchone()[0] if c.description else None
         conn.commit()
         c.close()
-        return result
+        return int(result) if result else None
     except Exception as e:
         conn.rollback()
         st.error(f"Insert error: {e}")
@@ -262,6 +280,8 @@ def get_patients():
 def get_sessions_for_patient(patient_id):
     """Fetch all sessions for a patient"""
     try:
+        # Convert numpy type to int
+        patient_id = convert_numpy_types(patient_id)
         results = execute_query(
             """SELECT id, session_number, session_date, status FROM tms_sessions 
                WHERE patient_id = %s ORDER BY session_number DESC""",
@@ -283,9 +303,10 @@ def calculate_intensity(percent_rmt, rmt_value):
 def get_next_session_number(patient_id):
     """Get next session number for a patient"""
     try:
+        patient_id = convert_numpy_types(patient_id)
         result = execute_query("SELECT MAX(session_number) FROM tms_sessions WHERE patient_id = %s", (patient_id,), fetch_one=True)
         if result and result[0]:
-            return result[0] + 1
+            return int(result[0]) + 1
         return 1
     except Exception as e:
         st.error(f"Error getting session number: {e}")
@@ -302,6 +323,7 @@ def is_holiday(date):
 def get_previous_session_data(patient_id):
     """Get previous session data for auto-population"""
     try:
+        patient_id = convert_numpy_types(patient_id)
         query = """SELECT ts.*, pl.protocol_name FROM tms_sessions ts
         LEFT JOIN protocol_library pl ON ts.protocol_id = pl.id
         WHERE ts.patient_id = %s ORDER BY ts.session_number DESC LIMIT 1"""
@@ -317,6 +339,9 @@ def get_previous_session_data(patient_id):
 def delete_session(session_id):
     """Delete a session and its associated slot"""
     try:
+        # Convert numpy type to int
+        session_id = convert_numpy_types(session_id)
+
         # Delete associated slot first
         execute_update("DELETE FROM daily_slots WHERE session_id = %s", (session_id,))
         # Delete session
@@ -329,6 +354,9 @@ def delete_session(session_id):
 def delete_patient(patient_id):
     """Delete a patient and all associated records"""
     try:
+        # Convert numpy type to int
+        patient_id = convert_numpy_types(patient_id)
+
         # This will cascade delete all sessions and slots due to foreign keys
         execute_update("DELETE FROM patients WHERE id = %s", (patient_id,))
         return True
@@ -369,7 +397,7 @@ if page == "📊 Daily Dashboard":
 
         # Count today's slots
         result = execute_query("SELECT COUNT(*) FROM daily_slots WHERE slot_date = %s", (selected_date,), fetch_one=True)
-        current_slots = result[0] if result else 0
+        current_slots = int(result[0]) if result else 0
         st.metric("Slots Scheduled Today", current_slots)
 
     with col3:
@@ -382,7 +410,7 @@ if page == "📊 Daily Dashboard":
 
         if results:
             for status, count in results:
-                st.metric(status, count)
+                st.metric(status, int(count))
 
     # Today's schedule
     st.markdown("### 📅 Today's Schedule")
@@ -414,7 +442,7 @@ if page == "📊 Daily Dashboard":
 
         if st.button("Remove Selected Session", type="secondary"):
             selected_idx = session_options.index(selected_session)
-            session_id = df.iloc[selected_idx]['session_id']
+            session_id = int(df.iloc[selected_idx]['session_id'])  # Explicit int conversion
 
             if delete_session(session_id):
                 st.success("✅ Session removed from schedule!")
@@ -452,7 +480,7 @@ elif page == "👤 Patient Referral":
                 """INSERT INTO patients (name, mrn, age, gender, primary_diagnosis,
                 tass_completed, consent_obtained, referred_date, status)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (patient_name, mrn, age, gender, primary_diagnosis, 1, 1,
+                (patient_name, mrn, int(age), gender, primary_diagnosis, 1, 1,
                 datetime.now().date(), 'Pending Review')
             ):
                 st.success("✅ Patient referral submitted successfully!")
@@ -485,7 +513,8 @@ elif page == "👤 Patient Referral":
         selected_patient_name = st.selectbox("Select patient to remove", patient_names)
 
         patient_name_to_remove = selected_patient_name.split(" (MRN:")[0]
-        patient_id = patients_df[patients_df['name'] == patient_name_to_remove]['id'].values[0]
+        # Convert to int explicitly
+        patient_id = int(patients_df[patients_df['name'] == patient_name_to_remove]['id'].values[0])
 
         # Show associated sessions count
         sessions_df = get_sessions_for_patient(patient_id)
@@ -511,7 +540,7 @@ elif page == "🗓️ Slot Management":
     if patients_df.empty:
         st.warning("⚠️ No patients in the system. Please add a patient referral first.")
     else:
-        patient_options = {f"{row['name']} (MRN: {row['mrn']})": row['id']
+        patient_options = {f"{row['name']} (MRN: {row['mrn']})": int(row['id'])
                           for _, row in patients_df.iterrows()}
 
         selected_patient = st.selectbox("Select Patient", list(patient_options.keys()))
@@ -535,7 +564,7 @@ elif page == "🗓️ Slot Management":
 
             if st.button("Delete Selected Session", type="secondary"):
                 selected_idx = session_options.index(selected_session)
-                session_id = sessions_df.iloc[selected_idx]['id']
+                session_id = int(sessions_df.iloc[selected_idx]['id'])  # Explicit int conversion
 
                 if delete_session(session_id):
                     st.success("✅ Session deleted successfully!")
@@ -559,7 +588,7 @@ elif page == "🗓️ Slot Management":
         protocols_df = get_protocols()
 
         if not protocols_df.empty:
-            protocol_options = {row['protocol_name']: row['id']
+            protocol_options = {row['protocol_name']: int(row['id'])
                               for _, row in protocols_df.iterrows()}
 
             selected_protocol = st.selectbox("Protocol", list(protocol_options.keys()))
@@ -580,7 +609,7 @@ elif page == "🗓️ Slot Management":
                 fetch_one=True
             )
 
-            base_duration = proto_result[0] if proto_result else 20
+            base_duration = int(proto_result[0]) if proto_result else 20
 
             for _ in range(num_sessions):
                 # Skip Sundays and holidays
@@ -595,7 +624,7 @@ elif page == "🗓️ Slot Management":
                     """INSERT INTO tms_sessions
                     (patient_id, session_number, session_date, protocol_id, status)
                     VALUES (%s, %s, %s, %s, 'Scheduled') RETURNING id""",
-                    (patient_id, session_num, current_date, protocol_id)
+                    (patient_id, int(session_num), current_date, protocol_id)
                 )
 
                 if session_id:
@@ -604,7 +633,7 @@ elif page == "🗓️ Slot Management":
                         """INSERT INTO daily_slots
                         (slot_date, session_id, scheduled_time, slot_duration, status)
                         VALUES (%s, %s, %s, %s, 'Scheduled')""",
-                        (current_date, session_id, "09:00", duration)
+                        (current_date, int(session_id), "09:00", int(duration))
                     )
 
                     created_count += 1
@@ -625,7 +654,7 @@ elif page == "📝 Session Parameters":
     if patients_df.empty:
         st.warning("⚠️ No patients in the system")
     else:
-        patient_options = {f"{row['name']} (MRN: {row['mrn']})": row['id']
+        patient_options = {f"{row['name']} (MRN: {row['mrn']})": int(row['id'])
                           for _, row in patients_df.iterrows()}
 
         selected_patient = st.selectbox("Select Patient", list(patient_options.keys()), key="param_patient")
@@ -643,6 +672,9 @@ elif page == "📝 Session Parameters":
             st.info("ℹ️ No scheduled session for today for this patient")
         else:
             session_id, session_num, protocol_id = results[0]
+            session_id = int(session_id)
+            session_num = int(session_num)
+            protocol_id = int(protocol_id) if protocol_id else None
 
             st.markdown(f"### Session #{session_num}")
 
@@ -655,7 +687,7 @@ elif page == "📝 Session Parameters":
                 st.subheader("Protocol & Target")
 
                 protocols_df = get_protocols()
-                protocol_options = {row['protocol_name']: row['id']
+                protocol_options = {row['protocol_name']: int(row['id'])
                                   for _, row in protocols_df.iterrows()}
 
                 selected_protocol = st.selectbox("Protocol Name", list(protocol_options.keys()))
@@ -718,16 +750,17 @@ elif page == "📝 Session Parameters":
                     coil_type = %s, side_effects = %s, remarks = %s,
                     status = 'Completed'
                     WHERE id = %s""",
-                    (laterality, target_region, coord_left_x, coord_left_y,
-                     coord_right_x, coord_right_y, rmt_left, rmt_right,
-                     intensity_pct_left, intensity_pct_right,
-                     intensity_out_left, intensity_out_right,
-                     coil_type, side_effects, remarks, session_id)
+                    (laterality, target_region, float(coord_left_x), float(coord_left_y),
+                     float(coord_right_x), float(coord_right_y), float(rmt_left), float(rmt_right),
+                     float(intensity_pct_left), float(intensity_pct_right),
+                     int(intensity_out_left) if intensity_out_left else None,
+                     int(intensity_out_right) if intensity_out_right else None,
+                     coil_type, side_effects, remarks, int(session_id))
                 ):
                     # Update slot status
                     execute_update(
                         "UPDATE daily_slots SET status = 'Completed' WHERE session_id = %s",
-                        (session_id,)
+                        (int(session_id),)
                     )
 
                     st.success("✅ Session completed successfully!")
@@ -796,8 +829,10 @@ elif page == "📚 Protocol Library":
                     (protocol_name, waveform_type, burst_pulses, inter_pulse_interval,
                     pulse_rate, pulses_per_train, num_trains, inter_train_interval, session_duration)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                    (protocol_name, waveform_type, burst_pulses, inter_pulse_interval,
-                     pulse_rate, pulses_per_train, num_trains, inter_train_interval, session_duration)
+                    (protocol_name, waveform_type, int(burst_pulses) if burst_pulses else None,
+                     float(inter_pulse_interval) if inter_pulse_interval else None,
+                     float(pulse_rate), int(pulses_per_train), int(num_trains),
+                     float(inter_train_interval), int(session_duration))
                 ):
                     st.success("✅ Protocol added successfully!")
 
@@ -839,4 +874,5 @@ elif page == "🎯 Holiday Calendar":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.info("💡 TMS Integration Dashboard v2.1 by Dr Aromal")
+st.sidebar.info("💡 TMS Integration Dashboard v2.2 (Type conversion fix applied)")
+
