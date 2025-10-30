@@ -14,7 +14,7 @@ import streamlit_authenticator as stauth
 import toml
 
 # --- Load config and set up authenticator ---
-config = toml.load("config.toml")
+config = st.secrets
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -683,6 +683,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
