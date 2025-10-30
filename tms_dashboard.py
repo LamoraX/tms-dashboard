@@ -15,6 +15,9 @@ import toml
 
 # --- Load config and set up authenticator ---
 config = dict(st.secrets)  
+config["credentials"] = dict(config["credentials"])
+config["cookie"] = dict(config["cookie"])
+
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -683,6 +686,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
