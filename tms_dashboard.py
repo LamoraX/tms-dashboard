@@ -13,27 +13,14 @@ import json
 import streamlit as st
 import streamlit_authenticator as stauth
 
-# Build config from secrets
-config = {
-    'credentials': {
-        'usernames': dict(st.secrets['credentials']['usernames'])
-    },
-    'cookie': {
-        'name': st.secrets['cookie']['name'],
-        'key': st.secrets['cookie']['key'],
-        'expiry_days': st.secrets['cookie']['expiry_days']
-    },
-    'preauthorized': {
-        'emails': []
-    }
-}
+credentials = dict(st.secrets['credentials'])
+cookie = st.secrets['cookie']
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
-    config['preauthorized']
+    credentials,
+    cookie['name'],
+    cookie['key'],
+    cookie['expiry_days']
 )
 
 # Login widget
@@ -697,6 +684,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
