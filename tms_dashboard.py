@@ -20,17 +20,18 @@ authenticator = stauth.Authenticate(
     st.secrets['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login('Login', 'main')
+# Fix: Use location parameter correctly (no form_name parameter)
+name, authentication_status, username = authenticator.login(location='main')
 
 if authentication_status == False:
     st.error('❌ Username/password is incorrect')
     st.stop()
 elif authentication_status == None:
-    st.warning('Please enter your username and password')
+    st.warning('⚠️ Please enter your username and password')
     st.stop()
 
 # Add logout button
-authenticator.logout('Logout', 'sidebar')
+authenticator.logout(location='sidebar')
 st.sidebar.markdown(f'Logged in as: **{name}**')
 
 
@@ -677,4 +678,5 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
