@@ -9,14 +9,13 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from datetime import datetime, timedelta
-import json
 import streamlit as st
 import streamlit_authenticator as stauth
-import copy  
+import json
 
-# Make a deep copy of credentials and cookie to make them mutable
-credentials = copy.deepcopy(st.secrets['credentials'])
-cookie = copy.deepcopy(st.secrets['cookie'])
+# Convert st.secrets sections safely to normal dicts
+credentials = json.loads(st.secrets['credentials'].to_json())
+cookie = json.loads(st.secrets['cookie'].to_json())
 
 authenticator = stauth.Authenticate(
     credentials,
@@ -33,7 +32,7 @@ if st.session_state["authentication_status"]:
     authenticator.logout(location='sidebar')
     st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
     
-    # Your dashboard code goes here...
+    # Your dashboard code here
 
 elif st.session_state["authentication_status"] is False:
     st.error('❌ Username/password is incorrect')
@@ -42,6 +41,7 @@ elif st.session_state["authentication_status"] is False:
 elif st.session_state["authentication_status"] is None:
     st.warning('⚠️ Please enter your username and password')
     st.stop()
+
 
 
 # Database setup
@@ -687,6 +687,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
