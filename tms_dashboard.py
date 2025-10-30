@@ -10,29 +10,48 @@ import pandas as pd
 import sqlite3
 from datetime import datetime, timedelta
 import json
+import streamlit as st
 import streamlit_authenticator as stauth
 
-# Load from Streamlit secrets
+# Build config from secrets
+config = {
+    'credentials': {
+        'usernames': dict(st.secrets['credentials']['usernames'])
+    },
+    'cookie': {
+        'name': st.secrets['cookie']['name'],
+        'key': st.secrets['cookie']['key'],
+        'expiry_days': st.secrets['cookie']['expiry_days']
+    },
+    'preauthorized': {
+        'emails': []
+    }
+}
+
 authenticator = stauth.Authenticate(
-    dict(st.secrets['credentials']),
-    st.secrets['cookie']['name'],
-    st.secrets['cookie']['key'],
-    st.secrets['cookie']['expiry_days']
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['preauthorized']
 )
 
-# Fix: Use location parameter correctly (no form_name parameter)
-name, authentication_status, username = authenticator.login(location='main')
+# Login widget
+authenticator.login()
 
-if authentication_status == False:
+# Check authentication status
+if st.session_state["authentication_status"]:
+    authenticator.logout(location='sidebar')
+    st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
+    
+    # Your dashboard code goes here...
+    
+elif st.session_state["authentication_status"] is False:
     st.error('❌ Username/password is incorrect')
     st.stop()
-elif authentication_status == None:
+elif st.session_state["authentication_status"] is None:
     st.warning('⚠️ Please enter your username and password')
     st.stop()
-
-# Add logout button
-authenticator.logout(location='sidebar')
-st.sidebar.markdown(f'Logged in as: **{name}**')
 
 
 # Database setup
@@ -678,5 +697,6 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
