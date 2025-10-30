@@ -11,12 +11,22 @@ import sqlite3
 from datetime import datetime, timedelta
 import streamlit as st
 import streamlit_authenticator as stauth
-import json
 
-# Safely convert secrets subsections into normal dicts
-credentials = json.loads(json.dumps(dict(st.secrets["credentials"])))
-cookie = json.loads(json.dumps(dict(st.secrets["cookie"])))
+# --- Recursive conversion helper ---
+def to_dict(obj):
+    if isinstance(obj, dict):
+        return {k: to_dict(v) for k, v in obj.items()}
+    try:
+        # handle Streamlit's Secrets objects
+        return dict(obj)
+    except Exception:
+        return obj
 
+# --- Convert secrets safely ---
+credentials = to_dict(st.secrets["credentials"])
+cookie = to_dict(st.secrets["cookie"])
+
+# --- Initialize authentication ---
 authenticator = stauth.Authenticate(
     credentials,
     cookie["name"],
@@ -24,10 +34,10 @@ authenticator = stauth.Authenticate(
     cookie["expiry_days"]
 )
 
-# Login widget
+# --- Login widget ---
 authenticator.login()
 
-# Check authentication status
+# --- Authentication status handling ---
 if st.session_state.get("authentication_status"):
     authenticator.logout(location="sidebar")
     st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
@@ -39,6 +49,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
     st.warning("⚠️ Please enter your username and password")
     st.stop()
+
 
 
 # Database setup
@@ -684,6 +695,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
