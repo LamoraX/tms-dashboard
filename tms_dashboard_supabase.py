@@ -97,7 +97,6 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     try:
         c = get_cursor()
         if params:
-            # Convert numpy types in params
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
@@ -120,7 +119,6 @@ def execute_update(query, params=None):
     try:
         c = get_cursor()
         if params:
-            # Convert numpy types in params
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
@@ -138,7 +136,6 @@ def execute_insert_with_return(query, params=None):
     try:
         c = get_cursor()
         if params:
-            # Convert numpy types in params
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
@@ -281,7 +278,6 @@ def get_patients():
 def get_sessions_for_patient(patient_id):
     """Fetch all sessions for a patient"""
     try:
-        # Convert numpy type to int
         patient_id = convert_numpy_types(patient_id)
         results = execute_query(
             """SELECT id, session_number, session_date, status FROM tms_sessions 
@@ -335,17 +331,71 @@ def get_previous_session_data(patient_id):
     except Exception as e:
         return None
 
+def calculate_next_slot_time(current_date, session_duration_minutes):
+    """Calculate the next available slot time based on existing slots for the date"""
+    try:
+        # Get all slots for the date sorted by time
+        results = execute_query(
+            """SELECT scheduled_time, slot_duration FROM daily_slots 
+               WHERE slot_date = %s ORDER BY scheduled_time""",
+            (current_date,)
+        )
+
+        if not results:
+            # First slot of the day
+            return "09:00"
+
+        # Parse existing slots and find next available time
+        occupied_times = []
+        for slot_time_str, duration in results:
+            # Parse HH:MM format
+            parts = slot_time_str.split(':')
+            slot_hour = int(parts[0])
+            slot_minute = int(parts[1])
+
+            # Convert to minutes from midnight
+            start_minutes = slot_hour * 60 + slot_minute
+            end_minutes = start_minutes + int(duration)
+
+            occupied_times.append((start_minutes, end_minutes))
+
+        # Sort by start time
+        occupied_times.sort()
+
+        # Find first gap
+        current_time_minutes = 9 * 60  # Start at 09:00
+
+        for start, end in occupied_times:
+            if current_time_minutes + session_duration_minutes <= start:
+                # Found a gap
+                hour = current_time_minutes // 60
+                minute = current_time_minutes % 60
+                return f"{hour:02d}:{minute:02d}"
+
+            # Move to end of current slot
+            current_time_minutes = end
+
+        # Use time after last slot
+        hour = current_time_minutes // 60
+        minute = current_time_minutes % 60
+
+        # Limit to working hours (9:00 to 17:00)
+        if hour >= 17:
+            return "09:00"  # Would exceed working hours, mark for next day
+
+        return f"{hour:02d}:{minute:02d}"
+
+    except Exception as e:
+        st.error(f"Error calculating slot time: {e}")
+        return "09:00"
+
 # ==================== DELETE FUNCTIONS ====================
 
 def delete_session(session_id):
     """Delete a session and its associated slot"""
     try:
-        # Convert numpy type to int
         session_id = convert_numpy_types(session_id)
-
-        # Delete associated slot first
         execute_update("DELETE FROM daily_slots WHERE session_id = %s", (session_id,))
-        # Delete session
         execute_update("DELETE FROM tms_sessions WHERE id = %s", (session_id,))
         return True
     except Exception as e:
@@ -355,10 +405,7 @@ def delete_session(session_id):
 def delete_patient(patient_id):
     """Delete a patient and all associated records"""
     try:
-        # Convert numpy type to int
         patient_id = convert_numpy_types(patient_id)
-
-        # This will cascade delete all sessions and slots due to foreign keys
         execute_update("DELETE FROM patients WHERE id = %s", (patient_id,))
         return True
     except Exception as e:
@@ -438,12 +485,12 @@ if page == "📊 Daily Dashboard":
 
         # Delete session from schedule
         st.markdown("### 🗑️ Remove Session from Schedule")
-        session_options = [f"Session {row['Session']} - {row['Patient']}" for _, row in df.iterrows()]
+        session_options = [f"Session {row['Session']} - {row['Patient']} @ {row['Time']}" for _, row in df.iterrows()]
         selected_session = st.selectbox("Select session to remove", session_options)
 
         if st.button("Remove Selected Session", type="secondary"):
             selected_idx = session_options.index(selected_session)
-            session_id = int(df.iloc[selected_idx]['session_id'])  # Explicit int conversion
+            session_id = int(df.iloc[selected_idx]['session_id'])
 
             if delete_session(session_id):
                 st.success("✅ Session removed from schedule!")
@@ -514,7 +561,6 @@ elif page == "👤 Patient Referral":
         selected_patient_name = st.selectbox("Select patient to remove", patient_names)
 
         patient_name_to_remove = selected_patient_name.split(" (MRN:")[0]
-        # Convert to int explicitly
         patient_id = int(patients_df[patients_df['name'] == patient_name_to_remove]['id'].values[0])
 
         # Show associated sessions count
@@ -565,7 +611,7 @@ elif page == "🗓️ Slot Management":
 
             if st.button("Delete Selected Session", type="secondary"):
                 selected_idx = session_options.index(selected_session)
-                session_id = int(sessions_df.iloc[selected_idx]['id'])  # Explicit int conversion
+                session_id = int(sessions_df.iloc[selected_idx]['id'])
 
                 if delete_session(session_id):
                     st.success("✅ Session deleted successfully!")
@@ -610,15 +656,15 @@ elif page == "🗓️ Slot Management":
                 fetch_one=True
             )
 
-            base_duration = int(proto_result[0]) if proto_result else 20
+            session_duration_minutes = int(proto_result[0]) if proto_result else 20
 
             for _ in range(num_sessions):
                 # Skip Sundays and holidays
                 while current_date.weekday() == 6 or is_holiday(current_date):
                     current_date += timedelta(days=1)
 
-                # Add 15 min for first session
-                duration = base_duration + 15 if session_num == 1 else base_duration
+                # Calculate next available slot time for this date
+                scheduled_time = calculate_next_slot_time(current_date, session_duration_minutes)
 
                 # Create session with RETURNING clause
                 session_id = execute_insert_with_return(
@@ -629,12 +675,12 @@ elif page == "🗓️ Slot Management":
                 )
 
                 if session_id:
-                    # Create slot
+                    # Create slot with auto-calculated time and protocol duration
                     execute_update(
                         """INSERT INTO daily_slots
                         (slot_date, session_id, scheduled_time, slot_duration, status)
                         VALUES (%s, %s, %s, %s, 'Scheduled')""",
-                        (current_date, int(session_id), "09:00", int(duration))
+                        (current_date, int(session_id), scheduled_time, session_duration_minutes)
                     )
 
                     created_count += 1
@@ -644,6 +690,7 @@ elif page == "🗓️ Slot Management":
 
             st.success(f"✅ Created {created_count} session slots successfully!")
             st.info("ℹ️ Sundays and holidays were automatically skipped")
+            st.info(f"ℹ️ Each session duration: {session_duration_minutes} minutes (from protocol)")
 
 # ==================== PAGE 4: SESSION PARAMETERS ====================
 
@@ -875,5 +922,6 @@ elif page == "🎯 Holiday Calendar":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.info("💡 TMS Integration Dashboard v2.2 (Type conversion fix applied)")
+st.sidebar.info("💡 TMS Integration Dashboard v3.0)")
+
 
