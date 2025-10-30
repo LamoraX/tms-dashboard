@@ -1,0 +1,12 @@
+[credentials.usernames.aromal]
+name = "aromal"
+password = "$2b$12$acpVSYLEBrh4JnId9Zv8Pu57yr/OCluWVAtGdyQ6c09QuEk2hSrpy"
+
+[credentials.usernames.resident]
+name = "SR"
+password = "$2b$12$r5UzgAl8yrJ4co0OkG1i/u3EBLIlgkfn9l9XAO2ZVR5GZfB1yGhXm"
+
+[cookie]
+name = "tms_dashboard_cookie"
+key = "random_key_12345"
+expiry_days = 7
