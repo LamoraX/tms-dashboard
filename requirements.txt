@@ -4,5 +4,6 @@ openpyxl
 plotly
 streamlit-authenticator
 PyYAML
-supabase-py
+supabase
+
 
