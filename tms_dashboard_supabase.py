@@ -15,11 +15,12 @@ import streamlit_authenticator as stauth
 import toml
 
 # --- Load config and set up authenticator ---
+config = toml.load("config.toml") 
 # Load config from Streamlit secrets for cloud deployment
-config = dict(st.secrets)
+#config = dict(st.secrets)
 
-config["credentials"] = dict(config["credentials"])
-config["cookie"] = dict(config["cookie"])
+#config["credentials"] = dict(config["credentials"])
+#config["cookie"] = dict(config["cookie"])
 
 authenticator = stauth.Authenticate(
     config["credentials"],
