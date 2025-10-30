@@ -11,22 +11,24 @@ import sqlite3
 from datetime import datetime, timedelta
 import streamlit as st
 import streamlit_authenticator as stauth
+import copy
 
-# --- Recursive conversion helper ---
 def to_dict(obj):
     if isinstance(obj, dict):
         return {k: to_dict(v) for k, v in obj.items()}
     try:
-        # handle Streamlit's Secrets objects
         return dict(obj)
     except Exception:
         return obj
 
-# --- Convert secrets safely ---
+# --- Convert to normal dicts ---
 credentials = to_dict(st.secrets["credentials"])
 cookie = to_dict(st.secrets["cookie"])
 
-# --- Initialize authentication ---
+# --- Make a fully mutable deep copy ---
+credentials = copy.deepcopy(credentials)
+
+# --- Initialize authenticator ---
 authenticator = stauth.Authenticate(
     credentials,
     cookie["name"],
@@ -37,18 +39,16 @@ authenticator = stauth.Authenticate(
 # --- Login widget ---
 authenticator.login()
 
-# --- Authentication status handling ---
+# --- Post-login handling ---
 if st.session_state.get("authentication_status"):
     authenticator.logout(location="sidebar")
     st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
 
 elif st.session_state.get("authentication_status") is False:
-    st.error("❌ Username/password is incorrect")
-    st.stop()
+    st.error("❌ Username/password incorrect")
 
 else:
     st.warning("⚠️ Please enter your username and password")
-    st.stop()
 
 
 
@@ -695,6 +695,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
