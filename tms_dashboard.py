@@ -13,10 +13,8 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import toml
 
-# --- Load credentials from local config file ---
+# --- Load config and set up authenticator ---
 config = toml.load("config.toml")
-
-# --- Initialize authenticator ---
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -24,19 +22,23 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-# --- Login widget ---
+# --- Login UI ---
 authenticator.login()
 
-# --- Authentication logic ---
-if st.session_state.get("authentication_status"):
-    authenticator.logout(location="sidebar")
-    st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
+auth_status = st.session_state.get("authentication_status")
 
-elif st.session_state.get("authentication_status") is False:
-    st.error("❌ Username/password is incorrect")
+if auth_status is None:
+    st.warning("⚠️ Please log in to continue.")
+    st.stop()  # 🚧 Stop execution here — nothing below is run or displayed
 
-else:
-    st.warning("⚠️ Please enter your username and password")
+elif auth_status is False:
+    st.error("❌ Username or password incorrect.")
+    st.stop()
+
+# --- If we reached here, user is authenticated ---
+authenticator.logout(location="sidebar")
+st.sidebar.markdown(f"👋 Logged in as: **{st.session_state['name']}**")
+
 
 # Database setup
 def init_database():
@@ -681,6 +683,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
