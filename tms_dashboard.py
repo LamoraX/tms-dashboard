@@ -11,46 +11,32 @@ import sqlite3
 from datetime import datetime, timedelta
 import streamlit as st
 import streamlit_authenticator as stauth
-import copy
+import toml
 
-def to_dict(obj):
-    if isinstance(obj, dict):
-        return {k: to_dict(v) for k, v in obj.items()}
-    try:
-        return dict(obj)
-    except Exception:
-        return obj
-
-# --- Convert to normal dicts ---
-credentials = to_dict(st.secrets["credentials"])
-cookie = to_dict(st.secrets["cookie"])
-
-# --- Make a fully mutable deep copy ---
-credentials = copy.deepcopy(credentials)
+# --- Load credentials from local config file ---
+config = toml.load("config.toml")
 
 # --- Initialize authenticator ---
 authenticator = stauth.Authenticate(
-    credentials,
-    cookie["name"],
-    cookie["key"],
-    cookie["expiry_days"]
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
 )
 
 # --- Login widget ---
 authenticator.login()
 
-# --- Post-login handling ---
+# --- Authentication logic ---
 if st.session_state.get("authentication_status"):
     authenticator.logout(location="sidebar")
     st.sidebar.markdown(f'Logged in as: **{st.session_state["name"]}**')
 
 elif st.session_state.get("authentication_status") is False:
-    st.error("❌ Username/password incorrect")
+    st.error("❌ Username/password is incorrect")
 
 else:
     st.warning("⚠️ Please enter your username and password")
-
-
 
 # Database setup
 def init_database():
@@ -695,6 +681,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
