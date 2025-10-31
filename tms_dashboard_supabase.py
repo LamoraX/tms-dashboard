@@ -500,24 +500,25 @@ if page == "📊 Daily Dashboard":
 
 # ==================== PAGE 2: PATIENT REFERRAL ====================
 
+# ==================== PAGE 2: PATIENT REFERRAL ====================
+
 elif page == "👤 Patient Referral":
     st.markdown("## 👤 Patient Referral")
-
     st.markdown("### 📋 Patient Information")
-
+    
     col1, col2 = st.columns(2)
-
+    
     with col1:
         patient_name = st.text_input("Patient Name *")
         mrn = st.text_input("MRN (Medical Record Number) *")
         age = st.number_input("Age", min_value=18, max_value=100, value=40)
         gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-
+    
     with col2:
         primary_diagnosis = st.text_area("Primary Diagnosis *", height=80)
         tass_completed = st.checkbox("TASS Checklist Completed *")
         consent_obtained = st.checkbox("TMS Consent Form Obtained *")
-
+    
     if st.button("Submit Referral", type="primary"):
         if not (patient_name and mrn and primary_diagnosis):
             st.error("❌ Please fill all required fields marked with *")
@@ -533,43 +534,94 @@ elif page == "👤 Patient Referral":
             ):
                 st.success("✅ Patient referral submitted successfully!")
                 st.info("ℹ️ Case forwarded to NIBS team for review")
-
+    
     # Display pending referrals
     st.markdown("### 📋 Pending Referrals")
-
+    
     results = execute_query(
         """SELECT id, name, mrn, age, gender, primary_diagnosis, referred_date, status
         FROM patients WHERE status = 'Pending Review'
         ORDER BY referred_date DESC"""
     )
-
+    
     if results:
         df = pd.DataFrame(results, columns=['ID', 'Name', 'MRN', 'Age', 'Gender', 'Diagnosis', 'Referred', 'Status'])
         st.dataframe(df, use_container_width=True)
+        
+        # ===== UPDATE PATIENT STATUS =====
+        st.markdown("### ✅ Review Pending Referrals")
+        
+        patient_list = [f"{row['Name']} (MRN: {row['MRN']})" for _, row in df.iterrows()]
+        
+        if patient_list:
+            selected_patient = st.selectbox(
+                "Select patient to update status", 
+                patient_list,
+                key="pending_patient_select"
+            )
+            
+            selected_idx = patient_list.index(selected_patient)
+            patient_id = int(df.iloc[selected_idx]['ID'])
+            patient_name_selected = df.iloc[selected_idx]['Name']
+            
+            st.info(f"ℹ️ Selected: {patient_name_selected} (ID: {patient_id})")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("✅ Mark as Review Done", key=f"btn_review_done_{patient_id}"):
+                    if execute_update(
+                        "UPDATE patients SET status = %s WHERE id = %s",
+                        ('Review Done', patient_id)
+                    ):
+                        st.success("✅ Status updated to 'Review Done'!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to update status")
+            
+            with col2:
+                if st.button("▶️ Mark as Started", key=f"btn_started_{patient_id}"):
+                    if execute_update(
+                        "UPDATE patients SET status = %s WHERE id = %s",
+                        ('Started', patient_id)
+                    ):
+                        st.success("✅ Status updated to 'Started'!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to update status")
+            
+            with col3:
+                if st.button("⏸️ Mark as Paused", key=f"btn_paused_{patient_id}"):
+                    if execute_update(
+                        "UPDATE patients SET status = %s WHERE id = %s",
+                        ('Paused', patient_id)
+                    ):
+                        st.success("✅ Status updated to 'Paused'!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to update status")
     else:
         st.info("ℹ️ No pending referrals")
-
+    
     # Remove patient section
     st.markdown("### 🗑️ Remove Patient from System")
-
+    
     patients_df = get_patients()
-
+    
     if not patients_df.empty:
         st.warning("⚠️ WARNING: This will permanently delete the patient and all associated sessions and data.")
-
+        
         patient_names = [f"{row['name']} (MRN: {row['mrn']})" for _, row in patients_df.iterrows()]
         selected_patient_name = st.selectbox("Select patient to remove", patient_names)
-
+        
         patient_name_to_remove = selected_patient_name.split(" (MRN:")[0]
         patient_id = int(patients_df[patients_df['name'] == patient_name_to_remove]['id'].values[0])
-
-        # Show associated sessions count
+        
         sessions_df = get_sessions_for_patient(patient_id)
         st.info(f"ℹ️ This patient has {len(sessions_df)} scheduled/completed sessions that will also be deleted.")
-
-        # Confirmation
+        
         confirm_delete = st.checkbox("I confirm I want to delete this patient and all associated data")
-
+        
         if st.button("Delete Patient Permanently", type="secondary", disabled=not confirm_delete):
             if delete_patient(patient_id):
                 st.success("✅ Patient and all associated records deleted!")
@@ -577,75 +629,6 @@ elif page == "👤 Patient Referral":
     else:
         st.info("ℹ️ No patients in system to delete")
 
-# Update patient status
-st.markdown("### ✅ Review Pending Referrals")
-
-# Fetch pending referrals FRESH
-results = execute_query(
-    """SELECT id, name, mrn, age, gender, primary_diagnosis, referred_date, status
-    FROM patients WHERE status = 'Pending Review'
-    ORDER BY referred_date DESC"""
-)
-
-if results:
-    df = pd.DataFrame(results, columns=['ID', 'Name', 'MRN', 'Age', 'Gender', 'Diagnosis', 'Referred', 'Status'])
-    
-    # Display the pending referrals
-    st.dataframe(df, use_container_width=True)
-    
-    # Selection and update controls
-    patient_list = [f"{row['Name']} (MRN: {row['MRN']})" for _, row in df.iterrows()]
-    
-    if patient_list:
-        selected_patient = st.selectbox(
-            "Select patient to update status", 
-            patient_list,
-            key="pending_patient_select"
-        )
-        
-        # Find the selected patient's index and ID
-        selected_idx = patient_list.index(selected_patient)
-        patient_id = int(df.iloc[selected_idx]['ID'])
-        patient_name = df.iloc[selected_idx]['Name']
-        
-        st.info(f"ℹ️ Selected: {patient_name} (ID: {patient_id})")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("✅ Mark as Review Done", key=f"btn_review_done_{patient_id}"):
-                if execute_update(
-                    "UPDATE patients SET status = %s WHERE id = %s",
-                    ('Review Done', patient_id)
-                ):
-                    st.success("✅ Status updated to 'Review Done'!")
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to update status")
-        
-        with col2:
-            if st.button("▶️ Mark as Started", key=f"btn_started_{patient_id}"):
-                if execute_update(
-                    "UPDATE patients SET status = %s WHERE id = %s",
-                    ('Started', patient_id)
-                ):
-                    st.success("✅ Status updated to 'Started'!")
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to update status")
-        
-        with col3:
-            if st.button("⏸️ Mark as Paused", key=f"btn_paused_{patient_id}"):
-                if execute_update(
-                    "UPDATE patients SET status = %s WHERE id = %s",
-                    ('Paused', patient_id)
-                ):
-                    st.success("✅ Status updated to 'Paused'!")
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to update status")
-else:
-    st.info("ℹ️ No pending referrals")
 
 
 # ==================== PAGE 3: SLOT MANAGEMENT ====================
