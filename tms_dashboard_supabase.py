@@ -577,6 +577,41 @@ elif page == "👤 Patient Referral":
     else:
         st.info("ℹ️ No patients in system to delete")
 
+# Update patient status
+st.markdown("### ✅ Review Pending Referrals")
+if not df.empty:
+    patient_to_review = st.selectbox("Select patient to review", 
+                                     [f"{row['Name']} (MRN: {row['MRN']})" 
+                                      for _, row in df.iterrows()])
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Mark as Review Done"):
+            patient_idx = [f"{row['Name']} (MRN: {row['MRN']})" 
+                          for _, row in df.iterrows()].index(patient_to_review)
+            patient_id = int(df.iloc[patient_idx]['ID'])
+            
+            if execute_update(
+                "UPDATE patients SET status = %s WHERE id = %s",
+                ('Review Done', patient_id)
+            ):
+                st.success("✅ Status updated to Review Done!")
+                st.rerun()
+    
+    with col2:
+        if st.button("Mark as Started"):
+            patient_idx = [f"{row['Name']} (MRN: {row['MRN']})" 
+                          for _, row in df.iterrows()].index(patient_to_review)
+            patient_id = int(df.iloc[patient_idx]['ID'])
+            
+            if execute_update(
+                "UPDATE patients SET status = %s WHERE id = %s",
+                ('Started', patient_id)
+            ):
+                st.success("✅ Status updated to Started!")
+                st.rerun()
+
+
 # ==================== PAGE 3: SLOT MANAGEMENT ====================
 
 elif page == "🗓️ Slot Management":
