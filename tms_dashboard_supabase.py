@@ -922,6 +922,6 @@ elif page == "🎯 Holiday Calendar":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.info("💡 TMS Integration Dashboard v3.0)")
+st.sidebar.info("💡 TMS Integration Dashboard v3.0 by Dr.Aromal")
 
 
