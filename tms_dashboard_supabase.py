@@ -579,37 +579,73 @@ elif page == "👤 Patient Referral":
 
 # Update patient status
 st.markdown("### ✅ Review Pending Referrals")
-if not df.empty:
-    patient_to_review = st.selectbox("Select patient to review", 
-                                     [f"{row['Name']} (MRN: {row['MRN']})" 
-                                      for _, row in df.iterrows()])
+
+# Fetch pending referrals FRESH
+results = execute_query(
+    """SELECT id, name, mrn, age, gender, primary_diagnosis, referred_date, status
+    FROM patients WHERE status = 'Pending Review'
+    ORDER BY referred_date DESC"""
+)
+
+if results:
+    df = pd.DataFrame(results, columns=['ID', 'Name', 'MRN', 'Age', 'Gender', 'Diagnosis', 'Referred', 'Status'])
     
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Mark as Review Done"):
-            patient_idx = [f"{row['Name']} (MRN: {row['MRN']})" 
-                          for _, row in df.iterrows()].index(patient_to_review)
-            patient_id = int(df.iloc[patient_idx]['ID'])
-            
-            if execute_update(
-                "UPDATE patients SET status = %s WHERE id = %s",
-                ('Review Done', patient_id)
-            ):
-                st.success("✅ Status updated to Review Done!")
-                st.rerun()
+    # Display the pending referrals
+    st.dataframe(df, use_container_width=True)
     
-    with col2:
-        if st.button("Mark as Started"):
-            patient_idx = [f"{row['Name']} (MRN: {row['MRN']})" 
-                          for _, row in df.iterrows()].index(patient_to_review)
-            patient_id = int(df.iloc[patient_idx]['ID'])
-            
-            if execute_update(
-                "UPDATE patients SET status = %s WHERE id = %s",
-                ('Started', patient_id)
-            ):
-                st.success("✅ Status updated to Started!")
-                st.rerun()
+    # Selection and update controls
+    patient_list = [f"{row['Name']} (MRN: {row['MRN']})" for _, row in df.iterrows()]
+    
+    if patient_list:
+        selected_patient = st.selectbox(
+            "Select patient to update status", 
+            patient_list,
+            key="pending_patient_select"
+        )
+        
+        # Find the selected patient's index and ID
+        selected_idx = patient_list.index(selected_patient)
+        patient_id = int(df.iloc[selected_idx]['ID'])
+        patient_name = df.iloc[selected_idx]['Name']
+        
+        st.info(f"ℹ️ Selected: {patient_name} (ID: {patient_id})")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("✅ Mark as Review Done", key=f"btn_review_done_{patient_id}"):
+                if execute_update(
+                    "UPDATE patients SET status = %s WHERE id = %s",
+                    ('Review Done', patient_id)
+                ):
+                    st.success("✅ Status updated to 'Review Done'!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update status")
+        
+        with col2:
+            if st.button("▶️ Mark as Started", key=f"btn_started_{patient_id}"):
+                if execute_update(
+                    "UPDATE patients SET status = %s WHERE id = %s",
+                    ('Started', patient_id)
+                ):
+                    st.success("✅ Status updated to 'Started'!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update status")
+        
+        with col3:
+            if st.button("⏸️ Mark as Paused", key=f"btn_paused_{patient_id}"):
+                if execute_update(
+                    "UPDATE patients SET status = %s WHERE id = %s",
+                    ('Paused', patient_id)
+                ):
+                    st.success("✅ Status updated to 'Paused'!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update status")
+else:
+    st.info("ℹ️ No pending referrals")
 
 
 # ==================== PAGE 3: SLOT MANAGEMENT ====================
