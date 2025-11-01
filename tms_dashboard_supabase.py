@@ -463,26 +463,74 @@ def delete_patient(patient_id):
 
 # ==================== PAGE 1: DAILY DASHBOARD ====================
 
+# ==================== PAGE 1: DAILY DASHBOARD ====================
+
 if page == "📊 Daily Dashboard":
     st.markdown("## 📊 TMS Daily Dashboard")
 
     selected_date = st.date_input("Select Date", datetime.now())
 
+    # ===== NEW: Load existing staff for this date =====
+    def get_staff_for_date(date):
+        """Get staff assignment for a specific date"""
+        try:
+            result = execute_query(
+                """SELECT DISTINCT sr_name, jr1_name, jr2_name FROM daily_slots
+                WHERE slot_date = %s LIMIT 1""",
+                (date,),
+                fetch_one=True
+            )
+            if result and result[0]:  # Check if sr_name exists
+                return result
+            return (None, None, None)
+        except Exception as e:
+            return (None, None, None)
+
+    # Load staff for selected date
+    sr_existing, jr1_existing, jr2_existing = get_staff_for_date(selected_date)
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("### 👨⚕️ Staff Assignment")
-        sr_name = st.text_input("Senior Resident", key="sr_daily")
-        jr1_name = st.text_input("Junior Resident 1", key="jr1_daily")
-        jr2_name = st.text_input("Junior Resident 2", key="jr2_daily")
+        
+        # Show if staff already assigned for this date
+        if sr_existing or jr1_existing or jr2_existing:
+            st.success("✅ Staff assignment exists for this date")
+            st.write(f"**SR:** {sr_existing if sr_existing else 'Not assigned'}")
+            st.write(f"**JR1:** {jr1_existing if jr1_existing else 'Not assigned'}")
+            st.write(f"**JR2:** {jr2_existing if jr2_existing else 'Not assigned'}")
+        
+        st.markdown("---")
+        st.markdown("**Update Staff Assignment:**")
+        
+        # Pre-fill with existing values or show empty
+        sr_name = st.text_input(
+            "Senior Resident", 
+            value=sr_existing if sr_existing else "", 
+            key="sr_daily"
+        )
+        jr1_name = st.text_input(
+            "Junior Resident 1", 
+            value=jr1_existing if jr1_existing else "", 
+            key="jr1_daily"
+        )
+        jr2_name = st.text_input(
+            "Junior Resident 2", 
+            value=jr2_existing if jr2_existing else "", 
+            key="jr2_daily"
+        )
 
-        if st.button("Save Staff Assignment"):
+        if st.button("Save Staff Assignment", type="primary"):
             if execute_update(
                 """UPDATE daily_slots SET sr_name = %s, jr1_name = %s, jr2_name = %s
                 WHERE slot_date = %s""",
                 (sr_name, jr1_name, jr2_name, selected_date)
             ):
                 st.success("✅ Staff assignment saved!")
+                st.rerun()
+            else:
+                st.info("ℹ️ No slots exist for this date. Create slots first to assign staff.")
 
     with col2:
         st.markdown("### 📊 Capacity Info")
@@ -535,6 +583,7 @@ if page == "📊 Daily Dashboard":
                 st.rerun()
     else:
         st.info("ℹ️ No sessions scheduled for this date")
+
 
 # ==================== PAGE 2: PATIENT REFERRAL ====================
 
