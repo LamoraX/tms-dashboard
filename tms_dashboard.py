@@ -13,18 +13,12 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import toml
 
-# --- Load config and set up authenticator ---
-config = toml.load("config.toml")  #now secrets are working, keeping it here for emergency second use
-
-#config = dict(st.secrets)  
-#config["credentials"] = dict(config["credentials"])
-#config["cookie"] = dict(config["cookie"])
-
+# --- Load config from Streamlit secrets ---
 authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"]
+    st.secrets["credentials"],
+    st.secrets["cookie"]["name"],
+    st.secrets["cookie"]["key"],
+    st.secrets["cookie"]["expiry_days"]
 )
 
 # --- Login UI ---
@@ -688,6 +682,7 @@ elif page == "🎯 Holiday Calendar":
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.info("💡 TMS Integration Dashboard v1.0\nDeveloped by Dr. Aromal S")
+
 
 
 
