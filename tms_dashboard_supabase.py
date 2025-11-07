@@ -575,7 +575,7 @@ if page == "📊 Daily Dashboard":
         ORDER BY ds.scheduled_time""", (selected_date,))
     
     if results:
-        df = pd.DataFrame(results, columns=['Patient', 'Session', 'Protocol', 'Target', 'Time', 'Status', 'Intensity (L/R)', 'slot_id', 'session_id'])
+        df = pd.DataFrame(results, columns=['Patient', 'Session#', 'Protocol', 'Target', 'Time', 'Status', 'Intensity (L/R)', 'slot_id', 'session_id'])
         
         # Add serial number column starting from 1
         df.insert(0, 'S.No', range(1, len(df) + 1))
@@ -584,7 +584,7 @@ if page == "📊 Daily Dashboard":
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
         st.markdown("### 🗑️ Remove Session from Schedule")
-        session_options = [f"Session {row['Session']} - {row['Patient']} @ {row['Time']}" for _, row in df.iterrows()]
+        session_options = [f"Session {row['Session#']} - {row['Patient']} @ {row['Time']}" for _, row in df.iterrows()]
         selected_session = st.selectbox("Select session to remove", session_options)
         
         if st.button("Remove Selected Session", type="secondary"):
