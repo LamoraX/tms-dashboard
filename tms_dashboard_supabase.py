@@ -801,19 +801,27 @@ elif page == "🗓️ Slot Management":
 
 # ==================== PAGE 4: SESSION PARAMETERS ====================
 
-elif page == "📝 Session Parameters":
-    st.markdown("## 📝 Session Parameters")
-
-    patients_df = get_patients()
-
-    if patients_df.empty:
-        st.warning("⚠️ No patients in the system")
+elif page == "Session Parameters":
+    st.markdown("## Session Parameters")
+    
+    # Fetch only patients with scheduled sessions for today
+    today = datetime.now().date()
+    results = executequery("""
+        SELECT DISTINCT p.id, p.name, p.mrn 
+        FROM patients p
+        INNER JOIN tmssessions ts ON p.id = ts.patientid
+        WHERE ts.sessiondate = %s AND ts.status = 'Scheduled'
+        ORDER BY p.name
+    """, (today,))
+    
+    if not results:
+        st.warning("No patients with scheduled sessions for today")
     else:
-        patient_options = {f"{row['name']} (MRN: {row['mrn']})": int(row['id'])
-                          for _, row in patients_df.iterrows()}
-        selected_patient = st.selectbox("Select Patient", list(patient_options.keys()), key="param_patient")
-        patient_id = patient_options[selected_patient]
-
+        patientsdf = pd.DataFrame(results, columns=['id', 'name', 'mrn'])
+        patientoptions = {f"{row['name']} (MRN: {row['mrn']})": int(row['id']) for _, row in patientsdf.iterrows()}
+        selectedpatient = st.selectbox("Select Patient", list(patientoptions.keys()), key="parampatient")
+        patientid = patientoptions[selectedpatient]
+        
         # Get previous parameters
         prev_params = get_previous_session_parameters(patient_id)
         
