@@ -575,7 +575,7 @@ if page == "📊 Daily Dashboard":
         ORDER BY ds.scheduled_time""", (selected_date,))
     
     if results:
-        df = pd.DataFrame(results, columns=['Patient', 'Session#', 'Protocol', 'Target', 'Time', 'Status', 'Intensity (L/R)', 'slot_id', 'session_id'])
+        df = pd.DataFrame(results, columns=['Patient', 'Session', 'Protocol', 'Target', 'Time', 'Status', 'Intensity (L/R)', 'slot_id', 'session_id'])
         
         # Add serial number column starting from 1
         df.insert(0, 'S.No', range(1, len(df) + 1))
