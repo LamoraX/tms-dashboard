@@ -801,40 +801,41 @@ elif page == "🗓️ Slot Management":
 
 # ==================== PAGE 4: SESSION PARAMETERS ====================
 
-elif page == "Session Parameters":
-    st.markdown("## Session Parameters")
+# ==================== PAGE 4: SESSION PARAMETERS ====================
+
+elif page == "📝 Session Parameters":
+    st.markdown("## 📝 Session Parameters")
     
     # Fetch only patients with scheduled sessions for today
     today = datetime.now().date()
-    results = executequery("""
+    results = execute_query("""
         SELECT DISTINCT p.id, p.name, p.mrn 
         FROM patients p
-        INNER JOIN tmssessions ts ON p.id = ts.patientid
-        WHERE ts.sessiondate = %s AND ts.status = 'Scheduled'
+        INNER JOIN tms_sessions ts ON p.id = ts.patient_id
+        WHERE ts.session_date = %s AND ts.status = 'Scheduled'
         ORDER BY p.name
     """, (today,))
     
     if not results:
-        st.warning("No patients with scheduled sessions for today")
+        st.warning("⚠️ No patients with scheduled sessions for today")
     else:
-        patientsdf = pd.DataFrame(results, columns=['id', 'name', 'mrn'])
-        patientoptions = {f"{row['name']} (MRN: {row['mrn']})": int(row['id']) for _, row in patientsdf.iterrows()}
-        selectedpatient = st.selectbox("Select Patient", list(patientoptions.keys()), key="parampatient")
-        patientid = patientoptions[selectedpatient]
+        patients_df = pd.DataFrame(results, columns=['id', 'name', 'mrn'])
+        patient_options = {f"{row['name']} (MRN: {row['mrn']})": int(row['id'])
+                          for _, row in patients_df.iterrows()}
+        selected_patient = st.selectbox("Select Patient", list(patient_options.keys()), key="param_patient")
+        patient_id = patient_options[selected_patient]
         
         # Get previous parameters
         prev_params = get_previous_session_parameters(patient_id)
-        
         if prev_params:
             st.info("📌 Loading parameters from previous session...")
-
-        today = datetime.now().date()
+        
         results = execute_query(
             """SELECT id, session_number, protocol_id FROM tms_sessions
             WHERE patient_id = %s AND session_date = %s AND status = 'Scheduled'""",
             (patient_id, today)
         )
-
+        
         if not results:
             st.info("ℹ️ No scheduled session for today for this patient")
         else:
@@ -842,17 +843,16 @@ elif page == "Session Parameters":
             session_id = int(session_id)
             session_num = int(session_num)
             protocol_id = int(protocol_id) if protocol_id else None
-
+            
             st.markdown(f"### Session #{session_num}")
-
+            
             col1, col2 = st.columns(2)
-
+            
             with col1:
                 st.subheader("Protocol & Target")
-
                 protocols_df = get_protocols()
                 protocol_options = {row['protocol_name']: int(row['id'])
-                                   for _, row in protocols_df.iterrows()}
+                                  for _, row in protocols_df.iterrows()}
                 
                 default_protocol = None
                 if prev_params and len(prev_params) > 13:
@@ -864,80 +864,77 @@ elif page == "Session Parameters":
                 
                 if default_protocol:
                     selected_protocol = st.selectbox("Protocol Name", list(protocol_options.keys()),
-                                                     index=list(protocol_options.keys()).index(default_protocol))
+                                                    index=list(protocol_options.keys()).index(default_protocol))
                 else:
                     selected_protocol = st.selectbox("Protocol Name", list(protocol_options.keys()))
-
+                
                 laterality_default = prev_params[0] if prev_params else "Left"
                 laterality = st.selectbox("Target Laterality", ["Left", "Right", "Bilateral"],
-                                         index=["Left", "Right", "Bilateral"].index(laterality_default))
-
+                                        index=["Left", "Right", "Bilateral"].index(laterality_default))
+                
                 target_region_default = prev_params[1] if prev_params else ""
                 target_region = st.text_input("Brain Region (e.g., DLPFC, IFG, PMC)",
-                                             value=target_region_default)
-
+                                            value=target_region_default)
+                
                 coil_type_default = prev_params[12] if prev_params else "rTMS (figure-8 coil)"
                 coil_type = st.selectbox("Coil Type",
-                                        ["rTMS (figure-8 coil)", "rTMS (double cone)",
-                                         "H1 (deep TMS)", "H4 (deep TMS)", "H7 (deep TMS)"],
-                                        index=["rTMS (figure-8 coil)", "rTMS (double cone)",
-                                               "H1 (deep TMS)", "H4 (deep TMS)", "H7 (deep TMS)"].index(coil_type_default))
-
+                                       ["rTMS (figure-8 coil)", "rTMS (double cone)",
+                                        "H1 (deep TMS)", "H4 (deep TMS)", "H7 (deep TMS)"],
+                                       index=["rTMS (figure-8 coil)", "rTMS (double cone)",
+                                             "H1 (deep TMS)", "H4 (deep TMS)", "H7 (deep TMS)"].index(coil_type_default))
+            
             with col2:
                 st.subheader("Coordinates (2D)")
-
                 coord_left_x_default = float(prev_params[2]) if prev_params and prev_params[2] else 0.0
                 coord_left_x = st.number_input("Left X (from outer canthus, cm)",
                                               value=coord_left_x_default, step=0.1)
-
+                
                 coord_left_y_default = float(prev_params[3]) if prev_params and prev_params[3] else 0.0
                 coord_left_y = st.number_input("Left Y (from tragus, cm)",
                                               value=coord_left_y_default, step=0.1)
-
+                
                 coord_right_x_default = float(prev_params[4]) if prev_params and prev_params[4] else 0.0
                 coord_right_x = st.number_input("Right X (from outer canthus, cm)",
                                                value=coord_right_x_default, step=0.1)
-
+                
                 coord_right_y_default = float(prev_params[5]) if prev_params and prev_params[5] else 0.0
                 coord_right_y = st.number_input("Right Y (from tragus, cm)",
                                                value=coord_right_y_default, step=0.1)
-
+            
             st.markdown("---")
-
+            
             col3, col4 = st.columns(2)
-
+            
             with col3:
                 st.subheader("Resting Motor Threshold (RMT)")
-
                 rmt_left_default = float(prev_params[6]) if prev_params and prev_params[6] else 0.0
                 rmt_left = st.number_input("Left RMT (%)", value=rmt_left_default, step=1.0)
-
+                
                 rmt_right_default = float(prev_params[7]) if prev_params and prev_params[7] else 0.0
                 rmt_right = st.number_input("Right RMT (%)", value=rmt_right_default, step=1.0)
-
+            
             with col4:
                 st.subheader("Treatment Intensity")
-
                 intensity_pct_left_default = float(prev_params[8]) if prev_params and prev_params[8] else 0.0
                 intensity_pct_left = st.number_input("% of RMT (Left)",
                                                     value=intensity_pct_left_default, step=1.0)
-
+                
                 intensity_pct_right_default = float(prev_params[9]) if prev_params and prev_params[9] else 0.0
                 intensity_pct_right = st.number_input("% of RMT (Right)",
                                                      value=intensity_pct_right_default, step=1.0)
-
+                
                 intensity_out_left = calculate_intensity(intensity_pct_left, rmt_left)
                 intensity_out_right = calculate_intensity(intensity_pct_right, rmt_right)
-
+                
                 st.metric("Intensity Output (Left)", f"{intensity_out_left}" if intensity_out_left else "-")
                 st.metric("Intensity Output (Right)", f"{intensity_out_right}" if intensity_out_right else "-")
-
+            
             st.markdown("---")
-
+            
             st.subheader("Session Notes")
             side_effects = st.text_area("Side Effects", height=100)
             remarks = st.text_area("Remarks", height=100)
-
+            
             if st.button("Complete Session", type="primary"):
                 params_dict = {
                     'target_laterality': laterality,
@@ -955,7 +952,7 @@ elif page == "Session Parameters":
                     'coil_type': coil_type,
                     'protocol_id': protocol_options[selected_protocol]
                 }
-
+                
                 if execute_update(
                     """UPDATE tms_sessions
                     SET target_laterality = %s, target_region = %s,
@@ -976,7 +973,6 @@ elif page == "Session Parameters":
                 ):
                     # Save parameters for next session
                     save_session_parameters(patient_id, session_id, params_dict)
-                    
                     execute_update(
                         "UPDATE daily_slots SET status = 'Completed' WHERE session_id = %s",
                         (int(session_id),)
