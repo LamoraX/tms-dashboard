@@ -441,25 +441,43 @@ def calculate_next_slot_time(current_date, session_duration_minutes):
 # ==================== DELETE FUNCTIONS ====================
 
 def delete_session(session_id):
-    """Delete a session and its associated slot"""
+    """Delete a session and renumber subsequent sessions for the same patient"""
     try:
         session_id = convert_numpy_types(session_id)
+        
+        # Get the patient_id and session_number of the session being deleted
+        result = execute_query(
+            "SELECT patient_id, session_number FROM tms_sessions WHERE id = %s",
+            (session_id,),
+            fetch_one=True
+        )
+        
+        if not result:
+            st.error("Session not found")
+            return False
+        
+        patient_id, deleted_session_num = result
+        patient_id = int(patient_id)
+        deleted_session_num = int(deleted_session_num)
+        
+        # Delete the session and its slot
         execute_update("DELETE FROM daily_slots WHERE session_id = %s", (session_id,))
         execute_update("DELETE FROM tms_sessions WHERE id = %s", (session_id,))
+        
+        # Renumber all subsequent sessions for this patient
+        execute_update("""
+            UPDATE tms_sessions 
+            SET session_number = session_number - 1 
+            WHERE patient_id = %s AND session_number > %s
+        """, (patient_id, deleted_session_num))
+        
+        st.success(f"✅ Session #{deleted_session_num} deleted and subsequent sessions renumbered")
         return True
+        
     except Exception as e:
         st.error(f"Error deleting session: {e}")
         return False
 
-def delete_patient(patient_id):
-    """Delete a patient and all associated records"""
-    try:
-        patient_id = convert_numpy_types(patient_id)
-        execute_update("DELETE FROM patients WHERE id = %s", (patient_id,))
-        return True
-    except Exception as e:
-        st.error(f"Error deleting patient: {e}")
-        return False
 
 # ==================== PAGE 1: DAILY DASHBOARD ====================
 
