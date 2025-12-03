@@ -9,7 +9,7 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
 import streamlit_authenticator as stauth
 import toml
 import numpy as np
@@ -303,9 +303,9 @@ def get_protocols():
 def get_patients():
     """Fetch all patients from database"""
     try:
-        results = execute_query("SELECT id, name, mrn, age, gender, primary_diagnosis, status FROM patients ORDER BY referred_date DESC")
+        results = execute_query("SELECT id, name, mrn, age, gender, primary_diagnosis, status, allowed_time FROM patients ORDER BY referred_date DESC")
         if results:
-            return pd.DataFrame(results, columns=['id', 'name', 'mrn', 'age', 'gender', 'primary_diagnosis', 'status'])
+            return pd.DataFrame(results, columns=['id', 'name', 'mrn', 'age', 'gender', 'primary_diagnosis', 'status', allowed_time])
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Error fetching patients: {e}")
@@ -655,6 +655,8 @@ elif page == "👤 Patient Referral":
         primary_diagnosis = st.text_area("Primary Diagnosis *", height=80)
         tass_completed = st.checkbox("TASS Checklist Completed *")
         consent_obtained = st.checkbox("TMS Consent Form Obtained *")
+        allowed_time = st.time_input("Allowed time", value=dtime(9, 0))
+
 
     if st.button("Submit Referral", type="primary"):
         if not (patient_name and mrn and primary_diagnosis):
@@ -664,10 +666,10 @@ elif page == "👤 Patient Referral":
         else:
             if execute_update(
                 """INSERT INTO patients (name, mrn, age, gender, primary_diagnosis,
-                tass_completed, consent_obtained, referred_date, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                tass_completed, consent_obtained, referred_date, status, allowed_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (patient_name, mrn, int(age), gender, primary_diagnosis, 1, 1,
-                 datetime.now().date(), 'Pending Review')
+                 datetime.now().date(), 'Pending Review', allowed_time,)
             ):
                 st.success("✅ Patient referral submitted successfully!")
                 st.info("ℹ️ Case forwarded to NIBS team for review")
