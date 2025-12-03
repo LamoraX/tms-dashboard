@@ -61,7 +61,7 @@ def init_database():
             port=st.secrets["DB_PORT"],
             database=st.secrets["DB_NAME"],
             user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"]
+            password=st.secrets["DB_PASSWORD"],
         )
         conn.autocommit = False
         return conn
@@ -69,34 +69,37 @@ def init_database():
         st.error(f"Database connection failed: {e}")
         st.stop()
 
-# Initialize connection
-if 'db_conn' not in st.session_state:
-    st.session_state.db_conn = init_database()
-conn = st.session_state.db_conn
+def get_conn():
+    """Return a live connection, recreating it if Supabase closed it."""
+    conn = st.session_state.get("db_conn")
+    if conn is None or conn.closed != 0:
+        conn = init_database()
+        st.session_state["db_conn"] = conn
+    return conn
 
 def get_cursor():
-    """Get a fresh cursor from the connection"""
-    try:
-        return conn.cursor()
-    except Exception as e:
-        conn.rollback()
-        return conn.cursor()
+    """Get a fresh cursor from a live connection"""
+    conn = get_conn()
+    return conn.cursor()
 
 def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     """Execute SELECT queries safely"""
+    conn = get_conn()
     try:
-        c = get_cursor()
+        c = conn.cursor()
         if params:
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
+
         if fetch_one:
             result = c.fetchone()
         elif fetch_all:
             result = c.fetchall()
         else:
             result = None
+
         c.close()
         return result
     except Exception as e:
@@ -106,13 +109,15 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
 
 def execute_update(query, params=None):
     """Execute INSERT/UPDATE/DELETE queries safely"""
+    conn = get_conn()
     try:
-        c = get_cursor()
+        c = conn.cursor()
         if params:
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
+
         conn.commit()
         c.close()
         return True
@@ -123,13 +128,15 @@ def execute_update(query, params=None):
 
 def execute_insert_with_return(query, params=None):
     """Execute INSERT and return the last inserted ID"""
+    conn = get_conn()
     try:
-        c = get_cursor()
+        c = conn.cursor()
         if params:
             params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
         else:
             c.execute(query)
+
         result = c.fetchone()[0] if c.description else None
         conn.commit()
         c.close()
@@ -141,111 +148,125 @@ def execute_insert_with_return(query, params=None):
 
 def create_tables():
     """Create all required tables"""
+    conn = get_conn()
     try:
-        c = get_cursor()
+        c = conn.cursor()
 
         # Patients table
-        c.execute("""CREATE TABLE IF NOT EXISTS patients
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS patients
         (id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        mrn TEXT UNIQUE NOT NULL,
-        age INTEGER,
-        gender TEXT,
-        primary_diagnosis TEXT,
-        tass_completed INTEGER DEFAULT 0,
-        consent_obtained INTEGER DEFAULT 0,
-        referred_date DATE,
-        status TEXT DEFAULT 'Pending Review')""")
+         name TEXT NOT NULL,
+         mrn TEXT UNIQUE NOT NULL,
+         age INTEGER,
+         gender TEXT,
+         primary_diagnosis TEXT,
+         tass_completed INTEGER DEFAULT 0,
+         consent_obtained INTEGER DEFAULT 0,
+         referred_date DATE,
+         status TEXT DEFAULT 'Pending Review')
+        """)
 
         # Protocol Library table
-        c.execute("""CREATE TABLE IF NOT EXISTS protocol_library
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS protocol_library
         (id SERIAL PRIMARY KEY,
-        protocol_name TEXT UNIQUE NOT NULL,
-        waveform_type TEXT,
-        burst_pulses INTEGER,
-        inter_pulse_interval REAL,
-        pulse_rate REAL,
-        pulses_per_train INTEGER,
-        num_trains INTEGER,
-        inter_train_interval REAL,
-        session_duration INTEGER)""")
+         protocol_name TEXT UNIQUE NOT NULL,
+         waveform_type TEXT,
+         burst_pulses INTEGER,
+         inter_pulse_interval REAL,
+         pulse_rate REAL,
+         pulses_per_train INTEGER,
+         num_trains INTEGER,
+         inter_train_interval REAL,
+         session_duration INTEGER)
+        """)
 
         # TMS Sessions table
-        c.execute("""CREATE TABLE IF NOT EXISTS tms_sessions
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS tms_sessions
         (id SERIAL PRIMARY KEY,
-        patient_id INTEGER,
-        session_number INTEGER,
-        session_date DATE,
-        protocol_id INTEGER,
-        target_laterality TEXT,
-        target_region TEXT,
-        coord_left_x REAL,
-        coord_left_y REAL,
-        coord_right_x REAL,
-        coord_right_y REAL,
-        rmt_left REAL,
-        rmt_right REAL,
-        intensity_percent_left REAL,
-        intensity_percent_right REAL,
-        intensity_output_left INTEGER,
-        intensity_output_right INTEGER,
-        coil_type TEXT,
-        side_effects TEXT,
-        remarks TEXT,
-        status TEXT DEFAULT 'Pending',
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
-        FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)""")
+         patient_id INTEGER,
+         session_number INTEGER,
+         session_date DATE,
+         protocol_id INTEGER,
+         target_laterality TEXT,
+         target_region TEXT,
+         coord_left_x REAL,
+         coord_left_y REAL,
+         coord_right_x REAL,
+         coord_right_y REAL,
+         rmt_left REAL,
+         rmt_right REAL,
+         intensity_percent_left REAL,
+         intensity_percent_right REAL,
+         intensity_output_left INTEGER,
+         intensity_output_right INTEGER,
+         coil_type TEXT,
+         side_effects TEXT,
+         remarks TEXT,
+         status TEXT DEFAULT 'Pending',
+         FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+         FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)
+        """)
 
         # Daily Slots table
-        c.execute("""CREATE TABLE IF NOT EXISTS daily_slots
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS daily_slots
         (id SERIAL PRIMARY KEY,
-        slot_date DATE,
-        session_id INTEGER,
-        scheduled_time TEXT,
-        slot_duration INTEGER,
-        status TEXT DEFAULT 'Scheduled',
-        sr_name TEXT,
-        jr1_name TEXT,
-        jr2_name TEXT,
-        FOREIGN KEY (session_id) REFERENCES tms_sessions(id) ON DELETE CASCADE)""")
+         slot_date DATE,
+         session_id INTEGER,
+         scheduled_time TEXT,
+         slot_duration INTEGER,
+         status TEXT DEFAULT 'Scheduled',
+         sr_name TEXT,
+         jr1_name TEXT,
+         jr2_name TEXT,
+         FOREIGN KEY (session_id) REFERENCES tms_sessions(id) ON DELETE CASCADE)
+        """)
 
         # Holiday Calendar table
-        c.execute("""CREATE TABLE IF NOT EXISTS holidays
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS holidays
         (id SERIAL PRIMARY KEY,
-        holiday_date DATE UNIQUE,
-        holiday_name TEXT,
-        skip_enabled INTEGER DEFAULT 1)""")
+         holiday_date DATE UNIQUE,
+         holiday_name TEXT,
+         skip_enabled INTEGER DEFAULT 1)
+        """)
 
-        # NEW: Session Parameters History table
-        c.execute("""CREATE TABLE IF NOT EXISTS session_parameters
+        # Session Parameters History table
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS session_parameters
         (id SERIAL PRIMARY KEY,
-        patient_id INTEGER NOT NULL,
-        session_id INTEGER,
-        target_laterality TEXT,
-        target_region TEXT,
-        coord_left_x REAL,
-        coord_left_y REAL,
-        coord_right_x REAL,
-        coord_right_y REAL,
-        rmt_left REAL,
-        rmt_right REAL,
-        intensity_percent_left REAL,
-        intensity_percent_right REAL,
-        intensity_output_left INTEGER,
-        intensity_output_right INTEGER,
-        coil_type TEXT,
-        protocol_id INTEGER,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
-        FOREIGN KEY (session_id) REFERENCES tms_sessions(id) ON DELETE SET NULL,
-        FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)""")
+         patient_id INTEGER NOT NULL,
+         session_id INTEGER,
+         target_laterality TEXT,
+         target_region TEXT,
+         coord_left_x REAL,
+         coord_left_y REAL,
+         coord_right_x REAL,
+         coord_right_y REAL,
+         rmt_left REAL,
+         rmt_right REAL,
+         intensity_percent_left REAL,
+         intensity_percent_right REAL,
+         intensity_output_left INTEGER,
+         intensity_output_right INTEGER,
+         coil_type TEXT,
+         protocol_id INTEGER,
+         created_at TIMESTAMP DEFAULT NOW(),
+         updated_at TIMESTAMP DEFAULT NOW(),
+         FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+         FOREIGN KEY (session_id) REFERENCES tms_sessions(id) ON DELETE SET NULL,
+         FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)
+        """)
 
         conn.commit()
         c.close()
         return True
     except Exception as e:
         conn.rollback()
+        st.error(f"Table creation error: {e}")
         return False
 
 # Initialize database tables
