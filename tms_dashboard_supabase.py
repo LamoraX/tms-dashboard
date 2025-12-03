@@ -305,7 +305,7 @@ def get_patients():
     try:
         results = execute_query("SELECT id, name, mrn, age, gender, primary_diagnosis, status, allowed_time FROM patients ORDER BY referred_date DESC")
         if results:
-            return pd.DataFrame(results, columns=['id', 'name', 'mrn', 'age', 'gender', 'primary_diagnosis', 'status', allowed_time])
+            return pd.DataFrame(results, columns=['id', 'name', 'mrn', 'age', 'gender', 'primary_diagnosis', 'status', 'allowed_time'])
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Error fetching patients: {e}")
