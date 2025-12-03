@@ -728,7 +728,7 @@ elif page == "👤 Patient Referral":
                     ):
                         st.success("✅ Status updated to 'Paused'!")
                         st.rerun()
-            st.markdown("### 🕒 Update Allowed Time for **{patient_name_selected}**")
+            st.markdown("### 🕒 Update Allowed Time for {patient_name_selected}")
             
             # Get current allowed_time
             result = execute_query(
