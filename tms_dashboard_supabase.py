@@ -724,11 +724,12 @@ elif page == "👤 Patient Referral":
                 if st.button("⏸️ Mark as Paused", key=f"btn_paused_{patient_id}"):
                     if execute_update(
                         "UPDATE patients SET status = %s WHERE id = %s",
-                        ('Paused', patient_id)
+                        ("Paused", patient_id),
                     ):
                         st.success("✅ Status updated to 'Paused'!")
                         st.rerun()
-            st.markdown("### 🕒 Update Allowed Time for {patient_name_selected}")
+            
+            st.markdown(f"### 🕒 Update Allowed Time for **{patient_name_selected}**")
             
             # Get current allowed_time
             result = execute_query(
@@ -737,8 +738,6 @@ elif page == "👤 Patient Referral":
                 fetch_one=True,
             )
             current_allowed = result[0] if result else None
-            
-            from datetime import time as dtime  # already imported earlier
             
             allowed_time_edit = st.time_input(
                 "Allowed time",
@@ -752,6 +751,7 @@ elif page == "👤 Patient Referral":
                     (allowed_time_edit, patient_id),
                 ):
                     st.success("✅ Allowed time updated.")
+
                        
     else:
         st.info("ℹ️ No pending referrals")
