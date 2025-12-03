@@ -593,31 +593,51 @@ if page == "📊 Daily Dashboard":
 
     st.markdown("### 📅 Today's Schedule")
     results = execute_query(
-        """SELECT p.name as patient_name, ts.session_number, pl.protocol_name,
-    COALESCE(ts.target_laterality || ' ' || ts.target_region, 'N/A') as target,
-    ds.scheduled_time, ds.status,
-    CASE
-    WHEN ts.intensity_output_left IS NOT NULL AND ts.intensity_output_right IS NOT NULL
-    THEN CAST(ts.intensity_output_left AS TEXT) || ' / ' || CAST(ts.intensity_output_right AS TEXT)
-    WHEN ts.intensity_output_left IS NOT NULL
-    THEN CAST(ts.intensity_output_left AS TEXT)
-    WHEN ts.intensity_output_right IS NOT NULL
-    THEN CAST(ts.intensity_output_right AS TEXT)
-    ELSE '-'
-    END as intensity,
-    p.allowed_time,
-    ds.id as slot_id, ts.id as session_id
+    """
+    SELECT
+      p.name AS patient_name,          -- Patient
+      ts.session_number,               -- Session#
+      pl.protocol_name,                -- Protocol
+      COALESCE(ts.target_laterality || ' ' || ts.target_region, 'N/A') AS target,
+      ds.scheduled_time,               -- Time
+      p.allowed_time,                  -- Allowed Time
+      ds.status,                       -- Status
+      CASE
+        WHEN ts.intensity_output_left IS NOT NULL AND ts.intensity_output_right IS NOT NULL
+          THEN CAST(ts.intensity_output_left AS TEXT) || ' / ' || CAST(ts.intensity_output_right AS TEXT)
+        WHEN ts.intensity_output_left IS NOT NULL
+          THEN CAST(ts.intensity_output_left AS TEXT)
+        WHEN ts.intensity_output_right IS NOT NULL
+          THEN CAST(ts.intensity_output_right AS TEXT)
+        ELSE '-'
+      END AS intensity,                -- Intensity (L/R)
+      ds.id AS slot_id,
+      ts.id AS session_id
     FROM daily_slots ds
     JOIN tms_sessions ts ON ds.session_id = ts.id
     JOIN patients p ON ts.patient_id = p.id
     LEFT JOIN protocol_library pl ON ts.protocol_id = pl.id
     WHERE ds.slot_date = %s
-    ORDER BY ds.scheduled_time""",
-        (selected_date,),
-    )
+    ORDER BY ds.scheduled_time
+    """,
+    (selected_date,),)
 
     if results:
-        df = pd.DataFrame(results, columns=['Patient', 'Session#', 'Protocol', 'Target', 'Time', 'Allowed Time', 'Status', 'Intensity (L/R)', 'slot_id', 'session_id'])
+        df = pd.DataFrame(
+            results,
+            columns=[
+                "Patient",
+                "Session#",
+                "Protocol",
+                "Target",
+                "Time",
+                "Allowed Time",
+                "Status",
+                "Intensity (L/R)",
+                "slot_id",
+                "session_id",
+            ],
+        )
         
         # Add serial number column starting from 1
         df.insert(0, 'S.No', range(1, len(df) + 1))
