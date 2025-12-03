@@ -752,28 +752,41 @@ elif page == "👤 Patient Referral":
                         st.success("✅ Status updated to 'Paused'!")
                         st.rerun()
             
-            st.markdown(f"### 🕒 Update Allowed Time for **{patient_name_selected}**")
+            st.markdown("### 🕒 Update Allowed Time for Any Patient")
             
-            # Get current allowed_time
-            result = execute_query(
-                "SELECT allowed_time FROM patients WHERE id = %s",
-                (patient_id,),
-                fetch_one=True,
-            )
-            current_allowed = result[0] if result else None
+            all_patients_df = get_patients()
+            if all_patients_df.empty:
+                st.info("ℹ️ No patients in system.")
+            else:
+                # Build label list with status so you know who is who
+                all_patients_df["label"] = all_patients_df.apply(
+                    lambda row: f"{row['name']} (MRN: {row['mrn']}) – {row['status']}",
+                    axis=1,
+                )
+                selected_label = st.selectbox(
+                    "Select patient",
+                    all_patients_df["label"].tolist(),
+                    key="allowed_any_patient",
+                )
+                selected_row = all_patients_df[all_patients_df["label"] == selected_label].iloc[0]
+                patient_id_any = int(selected_row["id"])
+                current_allowed_any = selected_row["allowed_time"]
             
-            allowed_time_edit = st.time_input(
-                "Allowed time",
-                value=current_allowed or dtime(9, 0),
-                key=f"allowed_time_{patient_id}",
-            )
+                from datetime import time as dtime  # near top of file
             
-            if st.button("Save Allowed Time", key=f"btn_save_allowed_{patient_id}"):
-                if execute_update(
-                    "UPDATE patients SET allowed_time = %s WHERE id = %s",
-                    (allowed_time_edit, patient_id),
-                ):
-                    st.success("✅ Allowed time updated.")
+                allowed_time_any = st.time_input(
+                    "Allowed time",
+                    value=current_allowed_any or dtime(9, 0),
+                    key=f"allowed_time_any_{patient_id_any}",
+                )
+            
+                if st.button("Save Allowed Time for Selected Patient"):
+                    if execute_update(
+                        "UPDATE patients SET allowed_time = %s WHERE id = %s",
+                        (allowed_time_any, patient_id_any),
+                    ):
+                        st.success("✅ Allowed time updated.")
+
 
                        
     else:
