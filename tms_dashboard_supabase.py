@@ -498,7 +498,32 @@ def delete_session(session_id):
     except Exception as e:
         st.error(f"Error deleting session: {e}")
         return False
+def delete_patient(patient_id):
+    """Delete a patient and all dependent records (sessions, slots, parameters)."""
+    try:
+        patient_id = convert_numpy_types(patient_id)
 
+        # Optional: double-check patient exists
+        result = execute_query(
+            "SELECT id FROM patients WHERE id = %s",
+            (patient_id,),
+            fetch_one=True
+        )
+        if not result:
+            st.error("Patient not found")
+            return False
+
+        # Because of ON DELETE CASCADE on patients → tms_sessions → daily_slots/session_parameters,
+        # a single DELETE is enough if FKs are set correctly.
+        if execute_update("DELETE FROM patients WHERE id = %s", (patient_id,)):
+            st.success("✅ Patient and all associated records deleted from database.")
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        st.error(f"Error deleting patient: {e}")
+        return False
 
 # ==================== PAGE 1: DAILY DASHBOARD ====================
 
