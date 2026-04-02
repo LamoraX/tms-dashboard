@@ -52,105 +52,82 @@ def convert_numpy_types(value):
 
 # ==================== DATABASE FUNCTIONS ====================
 
-@st.cache_resource
-def init_database():
-    """Initialize PostgreSQL connection to Supabase"""
-    try:
-        conn = psycopg2.connect(
-            host=st.secrets["DB_HOST"],
-            port=st.secrets["DB_PORT"],
-            database=st.secrets["DB_NAME"],
-            user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"],
-        )
-        conn.autocommit = False
-        return conn
-    except Exception as e:
-        st.error(f"Database connection failed: {e}")
-        st.stop()
+from contextlib import contextmanager
 
+def _get_db_kwargs():
+    return dict(
+        host=st.secrets["DB_HOST"],
+        port=st.secrets["DB_PORT"],
+        database=st.secrets["DB_NAME"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASSWORD"],
+    )
+
+@contextmanager
 def get_conn():
-    """Return a live connection, recreating it if Supabase closed it."""
-    conn = st.session_state.get("db_conn")
-    if conn is None or conn.closed != 0:
-        conn = init_database()
-        st.session_state["db_conn"] = conn
-    return conn
+    conn = psycopg2.connect(**_get_db_kwargs())
+    conn.autocommit = False
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
-def get_cursor():
-    """Get a fresh cursor from a live connection"""
-    conn = get_conn()
-    return conn.cursor()
 
 def execute_query(query, params=None, fetch_one=False, fetch_all=True):
-    """Execute SELECT queries safely"""
-    conn = get_conn()
     try:
-        c = conn.cursor()
-        if params:
-            params = tuple(convert_numpy_types(p) for p in params)
+        with get_conn() as conn:
+            c = conn.cursor()
+            if params:
+                params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
-        else:
-            c.execute(query)
-
-        if fetch_one:
-            result = c.fetchone()
-        elif fetch_all:
-            result = c.fetchall()
-        else:
-            result = None
-
-        c.close()
-        return result
+            if fetch_one:
+                result = c.fetchone()
+            elif fetch_all:
+                result = c.fetchall()
+            else:
+                result = None
+            c.close()
+            return result
     except Exception as e:
-        conn.rollback()
         st.error(f"Query error: {e}")
         return None
 
 def execute_update(query, params=None):
-    """Execute INSERT/UPDATE/DELETE queries safely"""
-    conn = get_conn()
     try:
-        c = conn.cursor()
-        if params:
-            params = tuple(convert_numpy_types(p) for p in params)
+        with get_conn() as conn:
+            c = conn.cursor()
+            if params:
+                params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
-        else:
-            c.execute(query)
-
-        conn.commit()
-        c.close()
+            c.close()
         return True
     except Exception as e:
-        conn.rollback()
         st.error(f"Update error: {e}")
         return False
 
 def execute_insert_with_return(query, params=None):
-    """Execute INSERT and return the last inserted ID"""
-    conn = get_conn()
     try:
-        c = conn.cursor()
-        if params:
-            params = tuple(convert_numpy_types(p) for p in params)
+        with get_conn() as conn:
+            c = conn.cursor()
+            if params:
+                params = tuple(convert_numpy_types(p) for p in params)
             c.execute(query, params)
-        else:
-            c.execute(query)
-
-        result = c.fetchone()[0] if c.description else None
-        conn.commit()
-        c.close()
+            result = c.fetchone()[0] if c.description else None
+            c.close()
         return int(result) if result else None
     except Exception as e:
-        conn.rollback()
         st.error(f"Insert error: {e}")
         return None
 
 def create_tables():
     """Create all required tables"""
-    conn = get_conn()
     try:
-        c = conn.cursor()
+        with get_conn() as conn:   # ← new get_conn() is a context manager, use 'with'
+            c = conn.cursor()      # ← conn here is always fresh, never dead
 
         # Patients table
         c.execute("""
@@ -261,16 +238,17 @@ def create_tables():
          FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)
         """)
 
-        conn.commit()
-        c.close()
-        return True
+            c.close()
+        return True                # ← commit happens automatically inside 'with'
     except Exception as e:
-        conn.rollback()
+        # NO conn.rollback() needed — the context manager handles it automatically
         st.error(f"Table creation error: {e}")
         return False
-
-# Initialize database tables
-create_tables()
+        
+# Initialize database tables — only once per session
+if "tables_initialized" not in st.session_state:
+    if create_tables():
+        st.session_state["tables_initialized"] = True
 
 # ==================== PAGE CONFIGURATION ====================
 
