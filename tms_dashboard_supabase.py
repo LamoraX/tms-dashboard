@@ -238,12 +238,12 @@ def create_tables():
          FOREIGN KEY (protocol_id) REFERENCES protocol_library(id) ON DELETE SET NULL)
         """)
 
-            c.close()
-        return True                # ← commit happens automatically inside 'with'
-    except Exception as e:
+        c.close()
+    return True                # ← commit happens automatically inside 'with'
+except Exception as e:
         # NO conn.rollback() needed — the context manager handles it automatically
-        st.error(f"Table creation error: {e}")
-        return False
+    st.error(f"Table creation error: {e}")
+    return False
         
 # Initialize database tables — only once per session
 if "tables_initialized" not in st.session_state:
