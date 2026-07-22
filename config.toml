@@ -6,6 +6,10 @@ password = "$2b$12$acpVSYLEBrh4JnId9Zv8Pu57yr/OCluWVAtGdyQ6c09QuEk2hSrpy"
 name = "SR"
 password = "$2b$12$r5UzgAl8yrJ4co0OkG1i/u3EBLIlgkfn9l9XAO2ZVR5GZfB1yGhXm"
 
+[credentials.usernames.surabhi]
+name = "surabhi"
+password = "$2b$12$acpVSYLEBrh4JnId9Zv8Pu57yr/OCluWVAtGdyQ6c09QuEk2hSrpy"
+
 [cookie]
 name = "tms_dashboard_cookie"
 key = "random_key_12345"
