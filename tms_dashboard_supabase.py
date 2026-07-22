@@ -4,7 +4,6 @@
 Created on Mon Oct 27 13:43:32 2025
 @author: aroma
 """
-import copy
 import streamlit as st
 import pandas as pd
 import psycopg2
@@ -14,6 +13,16 @@ import streamlit_authenticator as stauth
 import toml
 import numpy as np
 
+config = st.secrets.to_dict()      # <-- important
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"],
+)
+
+"""
 # --- Load config and set up authenticator ---
 credentials = copy.deepcopy(dict(st.secrets["credentials"]))
 #config = toml.load("config.toml")
@@ -23,7 +32,7 @@ authenticator = stauth.Authenticate(
     st.secrets["cookie"]["key"],
     st.secrets["cookie"]["expiry_days"]
 )
-
+"""
 # --- Login UI ---
 authenticator.login()
 auth_status = st.session_state.get("authentication_status")
