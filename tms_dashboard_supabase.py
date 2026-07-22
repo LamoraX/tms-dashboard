@@ -15,12 +15,12 @@ import toml
 import numpy as np
 
 # --- Load config and set up authenticator ---
-config = toml.load("config.toml")
+#config = toml.load("config.toml")
 authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"]
+    st.secrets["credentials"],
+    st.secrets["cookie"]["name"],
+    st.secrets["cookie"]["key"],
+    st.secrets["cookie"]["expiry_days"]
 )
 
 # --- Login UI ---
