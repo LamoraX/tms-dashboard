@@ -4,7 +4,7 @@
 Created on Mon Oct 27 13:43:32 2025
 @author: aroma
 """
-
+import copy
 import streamlit as st
 import pandas as pd
 import psycopg2
@@ -15,9 +15,10 @@ import toml
 import numpy as np
 
 # --- Load config and set up authenticator ---
+credentials = copy.deepcopy(dict(st.secrets["credentials"]))
 #config = toml.load("config.toml")
 authenticator = stauth.Authenticate(
-    st.secrets["credentials"],
+    credentials,
     st.secrets["cookie"]["name"],
     st.secrets["cookie"]["key"],
     st.secrets["cookie"]["expiry_days"]
