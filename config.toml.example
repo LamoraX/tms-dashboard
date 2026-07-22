@@ -1,3 +1,5 @@
+#used in previous version for debugging
+
 [credentials.usernames.aromal]
 name = "aromal"
 password = "$2b$12$acpVSYLEBrh4JnId9Zv8Pu57yr/OCluWVAtGdyQ6c09QuEk2hSrpy"
